@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+# This function listens on an Eventhub and sends events back to the emulator
+# via an Eventstream
+
 import azure.functions as func
 import logging
 import json

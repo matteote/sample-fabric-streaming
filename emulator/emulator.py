@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+# Run the script without parameters for help.
+# The script can be configured via file. Use emulator.ini.example as a reference.
+
 import asyncio
 import datetime
 import json
@@ -28,6 +31,7 @@ class Emulator:
     def power_consumption_wh(self):
         return self._power_consumption_wh + (1000 if self.ev_charging else 0)
 
+    # Send telemetry of meter and EV every 60 seconds
     async def send(self):
         while True:
             data = {
@@ -78,23 +82,27 @@ class Emulator:
 
             await asyncio.sleep(60)
 
+    # Helper to send events over eventstream
     async def send_event(self, data):
         print(f"Sending data:{data}")
 
         async with self.producer:
             await self.producer.send_event(EventData(json.dumps(data)))
 
+    # Responds to events received from eventstream
     async def on_event(self, partition_context, event):
         try:
             body = event.body_as_str(encoding="UTF-8")
             message = json.loads(body)
             print(f"Received: {message}")
 
+            # Turn off the EV charging
             if message.get("message", None) == "TurnEvChargingOff":
                 print("EV charging off")
                 self.ev_charging = False
                 self.print_status()
 
+            # Turn on the EV charging
             if message.get("message", None) == "TurnEvChargingOn":
                 print("EV charging on")
                 self.ev_charging = True
@@ -105,6 +113,7 @@ class Emulator:
 
         await partition_context.update_checkpoint(event)
 
+    # Listen on evenstream
     async def receive(self):
         checkpoint_store = BlobCheckpointStore.from_connection_string(
             self.args.storage_connection_string, self.args.storage_container
@@ -120,6 +129,8 @@ class Emulator:
         async with client:
             await client.receive(on_event=self.on_event, starting_position="-1")
 
+    # Listen on keyboard
+    # User must type a letter and press enter
     async def user_input(self):
         while True:
             loop = asyncio.get_event_loop()
@@ -147,28 +158,47 @@ class Emulator:
                     self.ev_charging = 0
             self.print_status()
 
+    # Print the status of the emulator
     def print_status(self):
         print(f"Power consumption: {self.power_consumption_wh()}")
         print(f"EV charging: {self.ev_charging}")
         print(f"EV plugged in: {self.ev_plugged_in}")
         print(f"EV battery: {self.ev_battery_level}")
 
+    # Main loop
     async def run(self):
         tasks = [self.send(), self.receive(), self.user_input()]
         await asyncio.gather(*tasks)
 
 
 p = ArgParser(default_config_files=["emulator.ini"])
+p.add("-c", "--config-file", required=False, is_config_file=True, help="Config file path")
 p.add(
-    "-c", "--config-file", required=False, is_config_file=True, help="Config file path"
+    "--source-event-hub-connection-string",
+    required=True,
+    help="Connection string of the Eventstream the emulator receives commands from.",
 )
-p.add("--source-event-hub-connection-string", required=True)
-p.add("--source-event-hub-name", required=True)
-p.add("--target-event-hub-connection-string", required=True)
-p.add("--target-event-hub-name", required=True)
-p.add("--storage-connection-string", required=True)
-p.add("--storage-container", required=True)
-p.add("--site-id", default=123)
+p.add(
+    "--source-event-hub-name",
+    required=True,
+    help="Item name of the Eventstream the emulator receives commands from.",
+)
+p.add(
+    "--target-event-hub-connection-string",
+    required=True,
+    help="Connection string of the Eventstream the emulator sends telemetry to.",
+)
+p.add(
+    "--target-event-hub-name",
+    required=True,
+    help="Item name of the Eventstream the emulator sends telemetry to.",
+)
+p.add(
+    "--storage-connection-string",
+    required=True,
+    help="Connection string of the storage account for the blob checkpoint store.",
+)
+p.add("--storage-container", required=True, help="Container for the blob checkpoint store.")
 
 args = p.parse_args()
 emulator = Emulator(args)
