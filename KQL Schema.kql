@@ -1,0 +1,28 @@
+.create-merge table telemetry (EventInstanceId:guid, EventName:string, EventTime:datetime, Device_Id:guid, Device_Type:string, Characteristics:dynamic)  
+
+.create table device_info(device_id:guid, site_name: string, customer_id: guid)
+
+.ingest inline into table device_info <|
+de286df4-71ea-427e-8519-104830ae1559,site1,cc7daaed-eb1b-49c5-9345-a156ae3d2ca7
+85fd20a9-c85c-4dc0-a6c9-2e20d5df1de2,site1,cc7daaed-eb1b-49c5-9345-a156ae3d2ca7
+
+.create table site_config (site_name:string, power_consumption_threshold_wh:int, ev_battery_max:int)
+
+.ingest inline into table site_config <|
+site1,1500,80
+
+.create-or-alter function GetMeterData(deviceId:guid) {
+    device_info
+    | where device_id == deviceId
+    | join kind=inner site_config on site_name
+    | project site_name, customer_id, power_consumption_threshold_wh
+    | limit 1
+}
+
+.create-or-alter function GetEvData(deviceId:guid) {
+    device_info
+    | where device_id == deviceId
+    | join kind=inner site_config on site_name
+    | project site_name, customer_id, ev_battery_max
+    | limit 1
+}

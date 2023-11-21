@@ -1,0 +1,6 @@
+source-event-hub-connection-string = "<Connection string of the eventhub used to receive commands>"
+source-event-hub-name = "<Name of the eventhub used to receive commands>"
+target-event-hub-connection-string = "<Connection string of the eventhub used to send telemetry>"
+target-event-hub-name = "<Name of the eventhub used to send telemetry>"
+storage-connection-string = "<Connection string of the storage account for the blob checkpoint store>"
+storage-container = "<Name of the container for the blob checkpoint store>"
